@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockInventory, mockPurchases, mockSales } from '@/data/mockData';
-import { getStockStatus } from '@/types/inventory';
+import { mockInventory, mockPurchases, mockSales, mockSurgeries } from '@/data/mockData';
+import { getStockStatus, CATEGORY_LABELS, MATERIAL_LABELS } from '@/types/inventory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsCard } from '@/components/ui/StatsCard';
 import { DataTable } from '@/components/ui/DataTable';
@@ -16,30 +16,32 @@ import {
 } from 'lucide-react';
 
 export default function Reports() {
-  const { isAdmin } = useAuth();
+  const { hasPermission } = useAuth();
+  const canViewFinancials = hasPermission('canViewFinancials');
 
-  // Redirect non-admin users
-  if (!isAdmin) {
+  // Redirect users without financial access
+  if (!canViewFinancials) {
     return <Navigate to="/dashboard" replace />;
   }
 
   const stats = useMemo(() => {
     const totalValue = mockInventory.reduce(
-      (sum, item) => sum + item.quantity * item.unitCost,
+      (sum, item) => sum + item.quantity * item.basePrice,
       0
     );
     const totalPurchases = mockPurchases.reduce((sum, p) => sum + p.totalCost, 0);
-    const totalSales = mockSales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+    const totalSales = mockSales.reduce((sum, s) => sum + s.totalSellingValue, 0);
+    const totalProfit = mockSurgeries.reduce((sum, s) => sum + s.profit, 0);
     const lowStockValue = mockInventory
       .filter((item) => getStockStatus(item.quantity, item.minStock) === 'low')
-      .reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
+      .reduce((sum, item) => sum + item.quantity * item.basePrice, 0);
 
     return {
       totalValue,
       totalPurchases,
       totalSales,
+      totalProfit,
       lowStockValue,
-      grossProfit: totalSales - totalPurchases,
     };
   }, []);
 
@@ -47,12 +49,13 @@ export default function Reports() {
     const categories: Record<string, { count: number; value: number; quantity: number }> = {};
     
     mockInventory.forEach((item) => {
-      if (!categories[item.category]) {
-        categories[item.category] = { count: 0, value: 0, quantity: 0 };
+      const catLabel = CATEGORY_LABELS[item.category];
+      if (!categories[catLabel]) {
+        categories[catLabel] = { count: 0, value: 0, quantity: 0 };
       }
-      categories[item.category].count++;
-      categories[item.category].quantity += item.quantity;
-      categories[item.category].value += item.quantity * item.unitCost;
+      categories[catLabel].count++;
+      categories[catLabel].quantity += item.quantity;
+      categories[catLabel].value += item.quantity * item.basePrice;
     });
 
     return Object.entries(categories).map(([category, data]) => ({
@@ -63,7 +66,7 @@ export default function Reports() {
 
   const topItems = useMemo(() => {
     return [...mockInventory]
-      .sort((a, b) => b.quantity * b.unitCost - a.quantity * a.unitCost)
+      .sort((a, b) => b.quantity * b.basePrice - a.quantity * a.basePrice)
       .slice(0, 10);
   }, []);
 
@@ -77,6 +80,14 @@ export default function Reports() {
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('en-EG').format(value);
+  };
+
+  const getItemSpecs = (item: typeof mockInventory[0]) => {
+    const parts = [];
+    if (item.material) parts.push(MATERIAL_LABELS[item.material]);
+    if (item.diameter) parts.push(item.diameter);
+    if (item.length) parts.push(item.length);
+    return parts.join(' × ') || '-';
   };
 
   return (
@@ -106,10 +117,10 @@ export default function Reports() {
           icon={TrendingDown}
         />
         <StatsCard
-          title="قيمة المخزون المنخفض"
-          value={formatCurrency(stats.lowStockValue)}
-          icon={AlertTriangle}
-          variant="warning"
+          title="إجمالي الأرباح"
+          value={formatCurrency(stats.totalProfit)}
+          icon={DollarSign}
+          variant="success"
         />
       </div>
 
@@ -179,7 +190,7 @@ export default function Reports() {
                 render: (item) => (
                   <div>
                     <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.size}</p>
+                    <p className="text-xs text-muted-foreground">{getItemSpecs(item)}</p>
                   </div>
                 ),
               },
@@ -195,7 +206,7 @@ export default function Reports() {
                 header: 'القيمة الإجمالية',
                 render: (item) => (
                   <span className="num font-medium text-primary">
-                    {formatCurrency(item.quantity * item.unitCost)}
+                    {formatCurrency(item.quantity * item.basePrice)}
                   </span>
                 ),
               },
@@ -223,7 +234,7 @@ export default function Reports() {
               render: (item) => (
                 <div>
                   <p className="font-medium text-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.size}</p>
+                  <p className="text-xs text-muted-foreground">{item.sku}</p>
                 </div>
               ),
             },
@@ -231,7 +242,7 @@ export default function Reports() {
               key: 'category',
               header: 'الفئة',
               render: (item) => (
-                <span className="text-muted-foreground">{item.category}</span>
+                <span className="text-muted-foreground">{CATEGORY_LABELS[item.category]}</span>
               ),
             },
             {
@@ -242,18 +253,25 @@ export default function Reports() {
               ),
             },
             {
-              key: 'unitCost',
-              header: 'السعر الثابت',
+              key: 'basePrice',
+              header: 'السعر الأساسي',
               render: (item) => (
-                <span className="num">{formatCurrency(item.unitCost)}</span>
+                <span className="num">{formatCurrency(item.basePrice)}</span>
+              ),
+            },
+            {
+              key: 'sellingPrice',
+              header: 'سعر البيع',
+              render: (item) => (
+                <span className="num text-primary">{formatCurrency(item.sellingPrice)}</span>
               ),
             },
             {
               key: 'totalValue',
               header: 'القيمة الإجمالية',
               render: (item) => (
-                <span className="num font-medium text-primary">
-                  {formatCurrency(item.quantity * item.unitCost)}
+                <span className="num font-medium text-success">
+                  {formatCurrency(item.quantity * item.basePrice)}
                 </span>
               ),
             },

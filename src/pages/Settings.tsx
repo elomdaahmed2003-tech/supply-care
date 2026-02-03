@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '@/types/roles';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +12,7 @@ import {
   HelpCircle,
   ChevronLeft,
   Check,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -20,7 +22,7 @@ interface SettingSection {
   title: string;
   description: string;
   icon: React.ElementType;
-  adminOnly?: boolean;
+  permission?: 'canManageSettings' | 'canManageUsers';
 }
 
 const sections: SettingSection[] = [
@@ -45,16 +47,20 @@ const sections: SettingSection[] = [
   {
     id: 'permissions',
     title: 'الصلاحيات',
-    description: 'إدارة صلاحيات المستخدمين',
+    description: 'عرض صلاحيات المستخدمين',
     icon: Shield,
-    adminOnly: true,
+  },
+  {
+    id: 'deadstock',
+    title: 'المخزون الراكد',
+    description: 'إعدادات حد المخزون الراكد',
+    icon: Clock,
   },
   {
     id: 'data',
     title: 'البيانات',
     description: 'تصدير واستيراد البيانات',
     icon: Database,
-    adminOnly: true,
   },
   {
     id: 'help',
@@ -65,13 +71,12 @@ const sections: SettingSection[] = [
 ];
 
 export default function Settings() {
-  const { user, isAdmin } = useAuth();
+  const { user, roleLabel, hasPermission } = useAuth();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deadStockMonths, setDeadStockMonths] = useState(6);
 
-  const filteredSections = sections.filter(
-    (section) => !section.adminOnly || isAdmin
-  );
+  const canManageSettings = hasPermission('canManageSettings');
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -93,7 +98,7 @@ export default function Settings() {
                 <h3 className="text-lg font-bold text-foreground">{user?.name}</h3>
                 <p className="text-muted-foreground">{user?.email}</p>
                 <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
-                  {isAdmin ? 'مدير النظام' : 'موظف المخزون'}
+                  {roleLabel}
                 </span>
               </div>
             </div>
@@ -178,9 +183,10 @@ export default function Settings() {
           <div className="space-y-4">
             {[
               { id: 'low-stock', label: 'تنبيه المخزون المنخفض', enabled: true },
+              { id: 'dead-stock', label: 'تنبيه المخزون الراكد', enabled: true },
               { id: 'new-purchase', label: 'فاتورة شراء جديدة', enabled: true },
-              { id: 'new-sale', label: 'عملية بيع جديدة', enabled: false },
-              { id: 'daily-report', label: 'التقرير اليومي', enabled: true },
+              { id: 'new-surgery', label: 'عملية جراحية جديدة', enabled: true },
+              { id: 'margin-warning', label: 'تحذير هامش الربح', enabled: true },
             ].map((item) => (
               <div
                 key={item.id}
@@ -209,28 +215,57 @@ export default function Settings() {
         return (
           <div className="space-y-4">
             <p className="text-muted-foreground">
-              إدارة صلاحيات المستخدمين والوصول للنظام
+              صلاحيات المستخدمين في النظام
             </p>
             <div className="space-y-3">
-              {[
-                { role: 'مدير النظام', permissions: 'كل الصلاحيات' },
-                { role: 'موظف المخزون', permissions: 'عرض وتعديل المخزون فقط' },
-              ].map((item) => (
+              {Object.entries(ROLE_LABELS).map(([role, label]) => (
                 <div
-                  key={item.role}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border"
+                  key={role}
+                  className="p-4 rounded-lg border border-border"
                 >
-                  <div>
-                    <p className="font-medium text-foreground">{item.role}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.permissions}
-                    </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium text-foreground">{label}</p>
+                    {user?.role === role && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        دورك الحالي
+                      </span>
+                    )}
                   </div>
-                  <Button variant="outline" size="sm">
-                    تعديل
-                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    {ROLE_DESCRIPTIONS[role as keyof typeof ROLE_DESCRIPTIONS]}
+                  </p>
                 </div>
               ))}
+            </div>
+          </div>
+        );
+
+      case 'deadstock':
+        return (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              تحديد فترة عدم الحركة التي يُعتبر بعدها الصنف مخزوناً راكداً
+            </p>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-foreground">
+                عدد الأشهر
+              </label>
+              <select
+                value={deadStockMonths}
+                onChange={(e) => setDeadStockMonths(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {[3, 6, 9, 12].map((months) => (
+                  <option key={months} value={months}>
+                    {months} أشهر
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/50">
+              <p className="text-sm text-muted-foreground">
+                الأصناف التي لم تتحرك منذ <span className="font-bold text-foreground">{deadStockMonths}</span> أشهر ستظهر كمخزون راكد في التحليلات.
+              </p>
             </div>
           </div>
         );
@@ -264,15 +299,23 @@ export default function Settings() {
                 للتواصل مع فريق الدعم الفني:
               </p>
               <p className="text-sm text-primary" dir="ltr">
-                support@hospital-supplies.com
+                support@ortho-supplies.com
               </p>
+            </div>
+            <div className="p-4 rounded-lg border border-border">
+              <h4 className="font-medium text-foreground mb-2">بيانات تسجيل الدخول التجريبية</h4>
+              <div className="space-y-2 text-sm">
+                <p><strong>إدخال بيانات:</strong> entry@hospital.com / entry123</p>
+                <p><strong>مشرف:</strong> supervisor@hospital.com / super123</p>
+                <p><strong>شريك:</strong> partner@hospital.com / partner123</p>
+              </div>
             </div>
             <div className="space-y-3">
               <h4 className="font-medium text-foreground">الأسئلة الشائعة</h4>
               {[
-                'كيف أضيف صنف جديد؟',
-                'كيف أسجل فاتورة شراء؟',
-                'كيف أصدر تقرير المخزون؟',
+                'كيف أسجل عملية جراحية جديدة؟',
+                'كيف أقوم بقطع شريحة؟',
+                'ما الفرق بين السعر الأساسي وسعر البيع؟',
               ].map((q) => (
                 <div
                   key={q}
@@ -327,7 +370,7 @@ export default function Settings() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredSections.map((section) => {
+          {sections.map((section) => {
             const Icon = section.icon;
             return (
               <button

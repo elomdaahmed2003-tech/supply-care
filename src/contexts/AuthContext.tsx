@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-
-export type UserRole = 'admin' | 'staff';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { UserRole, RolePermissions, ROLE_PERMISSIONS, ROLE_LABELS } from '@/types/roles';
 
 interface User {
   id: string;
@@ -12,31 +11,42 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isAdmin: boolean;
+  permissions: RolePermissions | null;
+  roleLabel: string;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  hasPermission: (permission: keyof RolePermissions) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo
+// Mock users for demo - 3 roles
 const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  'admin@hospital.com': {
-    password: 'admin123',
+  'entry@hospital.com': {
+    password: 'entry123',
     user: {
       id: '1',
-      name: 'أحمد محمد',
-      email: 'admin@hospital.com',
-      role: 'admin',
+      name: 'محمد علي',
+      email: 'entry@hospital.com',
+      role: 'data_entry',
     },
   },
-  'staff@hospital.com': {
-    password: 'staff123',
+  'supervisor@hospital.com': {
+    password: 'super123',
     user: {
       id: '2',
-      name: 'سارة أحمد',
-      email: 'staff@hospital.com',
-      role: 'staff',
+      name: 'أحمد محمد',
+      email: 'supervisor@hospital.com',
+      role: 'supervisor',
+    },
+  },
+  'partner@hospital.com': {
+    password: 'partner123',
+    user: {
+      id: '3',
+      name: 'خالد إبراهيم',
+      email: 'partner@hospital.com',
+      role: 'stakeholder',
     },
   },
 };
@@ -47,8 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const permissions = useMemo(() => {
+    if (!user) return null;
+    return ROLE_PERMISSIONS[user.role];
+  }, [user]);
+
+  const roleLabel = useMemo(() => {
+    if (!user) return '';
+    return ROLE_LABELS[user.role];
+  }, [user]);
+
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const mockUser = MOCK_USERS[email];
@@ -65,12 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('surgical_user');
   }, []);
 
+  const hasPermission = useCallback((permission: keyof RolePermissions): boolean => {
+    if (!permissions) return false;
+    return permissions[permission];
+  }, [permissions]);
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
+    permissions,
+    roleLabel,
     login,
     logout,
+    hasPermission,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

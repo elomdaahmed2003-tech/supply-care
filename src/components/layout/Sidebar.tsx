@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { ROLE_LABELS } from '@/types/roles';
 import {
   LayoutDashboard,
   Package,
@@ -11,8 +12,9 @@ import {
   LogOut,
   Menu,
   X,
-  Stethoscope,
+  Bone,
   ChevronLeft,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,26 +22,27 @@ interface NavItem {
   path: string;
   label: string;
   icon: React.ElementType;
-  adminOnly?: boolean;
+  permission?: 'canViewAnalytics' | 'canViewFinancials';
 }
 
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
   { path: '/inventory', label: 'المخزون', icon: Package },
   { path: '/purchases', label: 'المشتريات', icon: ShoppingCart },
-  { path: '/sales', label: 'الاستهلاك والمبيعات', icon: TrendingDown },
-  { path: '/reports', label: 'التقارير', icon: FileText, adminOnly: true },
+  { path: '/sales', label: 'العمليات الجراحية', icon: TrendingDown },
+  { path: '/analytics', label: 'التحليلات', icon: BarChart3, permission: 'canViewAnalytics' },
+  { path: '/reports', label: 'التقارير', icon: FileText, permission: 'canViewFinancials' },
   { path: '/settings', label: 'الإعدادات', icon: Settings },
 ];
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { user, isAdmin, logout } = useAuth();
+  const { user, hasPermission, roleLabel, logout } = useAuth();
   const location = useLocation();
 
   const filteredNavItems = navItems.filter(
-    (item) => !item.adminOnly || isAdmin
+    (item) => !item.permission || hasPermission(item.permission)
   );
 
   const NavContent = () => (
@@ -47,12 +50,12 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-6 border-b border-sidebar-border">
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary text-primary-foreground">
-          <Stethoscope className="w-5 h-5" />
+          <Bone className="w-5 h-5" />
         </div>
         {!isCollapsed && (
           <div className="animate-fade-in">
-            <h1 className="font-bold text-foreground">إدارة المستلزمات</h1>
-            <p className="text-xs text-muted-foreground">الجراحية</p>
+            <h1 className="font-bold text-foreground">مستلزمات العظام</h1>
+            <p className="text-xs text-muted-foreground">نظام إدارة سلسلة التوريد</p>
           </div>
         )}
       </div>
@@ -98,7 +101,7 @@ export function Sidebar() {
                 {user?.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                {isAdmin ? 'مدير النظام' : 'موظف المخزون'}
+                {roleLabel}
               </p>
             </div>
           </div>

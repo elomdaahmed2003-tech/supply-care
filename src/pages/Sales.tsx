@@ -1,40 +1,52 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockSales, mockInventory } from '@/data/mockData';
-import { Sale } from '@/types/inventory';
+import { mockSales, mockInventory, mockDoctors, mockSurgeries } from '@/data/mockData';
+import { Sale, MATERIAL_LABELS, validateMargin } from '@/types/inventory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit2, Trash2, TrendingDown, ShoppingBag } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingDown, ShoppingBag, Activity, Lock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function Sales() {
-  const { isAdmin } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const canCreate = hasPermission('canCreateStockOut');
+  const canEdit = hasPermission('canEditAfterSubmit');
+  const canDelete = hasPermission('canDeleteRecords');
+  const canViewPrices = hasPermission('canViewPrices');
+  const canViewProfit = hasPermission('canViewProfit');
+
   const [sales, setSales] = useState<Sale[]>(mockSales);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'sale' | 'usage'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'sale' | 'usage' | 'surgery'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editSale, setEditSale] = useState<Sale | null>(null);
   const [deleteSale, setDeleteSale] = useState<Sale | null>(null);
+  const [marginError, setMarginError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     itemId: '',
     itemName: '',
     quantity: 0,
-    unitPrice: 0,
+    basePrice: 0,
+    sellingPrice: 0,
     date: new Date().toISOString().split('T')[0],
-    type: 'usage' as 'sale' | 'usage',
+    type: 'surgery' as 'sale' | 'usage' | 'surgery',
+    doctorId: '',
+    doctorName: '',
+    patientName: '',
     notes: '',
   });
 
   const filteredSales = useMemo(() => {
     return sales.filter((s) => {
-      const matchesSearch = s.itemName.includes(search);
+      const matchesSearch = s.itemName.includes(search) || (s.patientName?.includes(search) ?? false);
       const matchesType = typeFilter === 'all' || s.type === typeFilter;
       return matchesSearch && matchesType;
     });
@@ -52,16 +64,29 @@ export default function Sales() {
     return new Intl.NumberFormat('en-EG').format(value);
   };
 
+  const getItemDisplayName = (item: typeof mockInventory[0]) => {
+    const parts = [item.name];
+    if (item.material) parts.push(MATERIAL_LABELS[item.material]);
+    if (item.diameter) parts.push(item.diameter);
+    if (item.length) parts.push(item.length);
+    return parts.join(' - ');
+  };
+
   const resetForm = () => {
     setFormData({
       itemId: '',
       itemName: '',
       quantity: 0,
-      unitPrice: 0,
+      basePrice: 0,
+      sellingPrice: 0,
       date: new Date().toISOString().split('T')[0],
-      type: 'usage',
+      type: 'surgery',
+      doctorId: '',
+      doctorName: '',
+      patientName: '',
       notes: '',
     });
+    setMarginError(null);
   };
 
   const openAddModal = () => {
@@ -70,29 +95,69 @@ export default function Sales() {
   };
 
   const openEditModal = (sale: Sale) => {
+    if (sale.isLocked && !canEdit) {
+      toast.error('لا يمكن تعديل هذا السجل بعد الحفظ');
+      return;
+    }
     setFormData({
       itemId: sale.itemId,
       itemName: sale.itemName,
       quantity: sale.quantity,
-      unitPrice: sale.unitPrice || 0,
+      basePrice: sale.basePrice,
+      sellingPrice: sale.sellingPrice,
       date: format(sale.date, 'yyyy-MM-dd'),
       type: sale.type,
+      doctorId: sale.doctorId || '',
+      doctorName: sale.doctorName || '',
+      patientName: sale.patientName || '',
       notes: sale.notes || '',
     });
     setEditSale(sale);
+    setMarginError(null);
   };
 
   const handleItemChange = (itemId: string) => {
     const item = mockInventory.find((i) => i.id === itemId);
+    if (item) {
+      setFormData({
+        ...formData,
+        itemId,
+        itemName: getItemDisplayName(item),
+        basePrice: item.basePrice,
+        sellingPrice: item.sellingPrice,
+      });
+    }
+  };
+
+  const handleDoctorChange = (doctorId: string) => {
+    const doctor = mockDoctors.find((d) => d.id === doctorId);
     setFormData({
       ...formData,
-      itemId,
-      itemName: item ? `${item.name} - ${item.size}` : '',
+      doctorId,
+      doctorName: doctor?.name || '',
     });
   };
 
+  const handleSellingPriceChange = (value: number) => {
+    setFormData({ ...formData, sellingPrice: value });
+    const validation = validateMargin(formData.basePrice, value);
+    if (!validation.isValid) {
+      setMarginError(validation.message || null);
+    } else {
+      setMarginError(null);
+    }
+  };
+
   const handleSave = () => {
-    const totalPrice = formData.type === 'sale' ? formData.quantity * formData.unitPrice : undefined;
+    // Validate margin
+    const validation = validateMargin(formData.basePrice, formData.sellingPrice);
+    if (!validation.isValid && formData.type !== 'usage') {
+      toast.error('تحذير حرج: سعر البيع أقل من السعر الأساسي!');
+      return;
+    }
+
+    const totalBaseValue = formData.quantity * formData.basePrice;
+    const totalSellingValue = formData.quantity * formData.sellingPrice;
 
     if (editSale) {
       setSales((prev) =>
@@ -101,22 +166,38 @@ export default function Sales() {
             ? {
                 ...s,
                 ...formData,
-                totalPrice,
+                totalBaseValue,
+                totalSellingValue,
                 date: new Date(formData.date),
               }
             : s
         )
       );
       setEditSale(null);
+      toast.success('تم تحديث العملية');
     } else {
       const newSale: Sale = {
         id: Date.now().toString(),
-        ...formData,
-        totalPrice,
+        itemId: formData.itemId,
+        itemName: formData.itemName,
+        quantity: formData.quantity,
+        basePrice: formData.basePrice,
+        sellingPrice: formData.sellingPrice,
+        totalBaseValue,
+        totalSellingValue,
         date: new Date(formData.date),
+        type: formData.type,
+        doctorId: formData.doctorId || undefined,
+        doctorName: formData.doctorName || undefined,
+        patientName: formData.patientName || undefined,
+        notes: formData.notes || undefined,
+        createdBy: user?.id || '',
+        createdAt: new Date(),
+        isLocked: true,
       };
       setSales((prev) => [newSale, ...prev]);
       setIsAddModalOpen(false);
+      toast.success('تم تسجيل العملية');
     }
     resetForm();
   };
@@ -125,6 +206,7 @@ export default function Sales() {
     if (deleteSale) {
       setSales((prev) => prev.filter((s) => s.id !== deleteSale.id));
       setDeleteSale(null);
+      toast.success('تم حذف العملية');
     }
   };
 
@@ -148,6 +230,8 @@ export default function Sales() {
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
               item.type === 'sale'
                 ? 'bg-primary/10 text-primary'
+                : item.type === 'surgery'
+                ? 'bg-success/10 text-success'
                 : 'bg-muted text-muted-foreground'
             )}
           >
@@ -155,6 +239,11 @@ export default function Sales() {
               <>
                 <ShoppingBag className="w-3 h-3" />
                 بيع
+              </>
+            ) : item.type === 'surgery' ? (
+              <>
+                <Activity className="w-3 h-3" />
+                جراحة
               </>
             ) : (
               <>
@@ -173,6 +262,16 @@ export default function Sales() {
         ),
       },
       {
+        key: 'patient',
+        header: 'المريض/الطبيب',
+        render: (item: Sale) => (
+          <div className="text-sm">
+            {item.patientName && <p className="text-foreground">{item.patientName}</p>}
+            {item.doctorName && <p className="text-xs text-muted-foreground">{item.doctorName}</p>}
+          </div>
+        ),
+      },
+      {
         key: 'quantity',
         header: 'الكمية',
         render: (item: Sale) => (
@@ -183,58 +282,69 @@ export default function Sales() {
       },
     ];
 
-    if (isAdmin) {
+    if (canViewPrices) {
       baseColumns.push({
-        key: 'totalPrice',
+        key: 'totalValue',
         header: 'الإجمالي',
         render: (item: Sale) => (
           <span className="num font-medium">
-            {item.totalPrice ? formatCurrency(item.totalPrice) : '-'}
+            {formatCurrency(item.totalSellingValue)}
           </span>
         ),
       });
     }
 
-    baseColumns.push(
-      {
-        key: 'notes',
-        header: 'ملاحظات',
+    if (canViewProfit) {
+      baseColumns.push({
+        key: 'profit',
+        header: 'الربح',
         render: (item: Sale) => (
-          <span className="text-muted-foreground text-xs truncate max-w-[150px] block">
-            {item.notes || '-'}
+          <span className="num font-medium text-success">
+            {formatCurrency(item.totalSellingValue - item.totalBaseValue)}
           </span>
         ),
-      },
-      {
-        key: 'actions',
-        header: 'الإجراءات',
-        render: (item: Sale) => (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openEditModal(item);
-              }}
-              className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteSale(item);
-              }}
-              className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        ),
-      }
-    );
+      });
+    }
+
+    baseColumns.push({
+      key: 'actions',
+      header: 'الإجراءات',
+      render: (item: Sale) => (
+        <div className="flex items-center gap-2">
+          {item.isLocked && !canEdit ? (
+            <Lock className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <>
+              {canEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditModal(item);
+                  }}
+                  className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteSale(item);
+                  }}
+                  className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ),
+    });
 
     return baseColumns;
-  }, [isAdmin]);
+  }, [canViewPrices, canViewProfit, canEdit, canDelete]);
 
   const FormContent = () => (
     <div className="space-y-4">
@@ -247,11 +357,20 @@ export default function Sales() {
             <input
               type="radio"
               name="type"
+              value="surgery"
+              checked={formData.type === 'surgery'}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as typeof formData.type })}
+              className="w-4 h-4 text-primary"
+            />
+            <span className="text-sm">عملية جراحية</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="type"
               value="usage"
               checked={formData.type === 'usage'}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value as 'usage' | 'sale' })
-              }
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as typeof formData.type })}
               className="w-4 h-4 text-primary"
             />
             <span className="text-sm">استهلاك داخلي</span>
@@ -262,15 +381,47 @@ export default function Sales() {
               name="type"
               value="sale"
               checked={formData.type === 'sale'}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value as 'usage' | 'sale' })
-              }
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as typeof formData.type })}
               className="w-4 h-4 text-primary"
             />
             <span className="text-sm">بيع خارجي</span>
           </label>
         </div>
       </div>
+
+      {formData.type === 'surgery' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground">
+              الطبيب <span className="text-destructive">*</span>
+            </label>
+            <select
+              value={formData.doctorId}
+              onChange={(e) => handleDoctorChange(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">اختر الطبيب</option>
+              {mockDoctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.name} - {doctor.specialty}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground">
+              اسم المريض <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.patientName}
+              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+              className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="اسم المريض"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -285,7 +436,7 @@ export default function Sales() {
             <option value="">اختر الصنف</option>
             {mockInventory.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} - {item.size} (متاح: {item.quantity})
+                {getItemDisplayName(item)} (متاح: {item.quantity})
               </option>
             ))}
           </select>
@@ -312,26 +463,24 @@ export default function Sales() {
           <input
             type="number"
             value={formData.quantity}
-            onChange={(e) =>
-              setFormData({ ...formData, quantity: Number(e.target.value) })
-            }
+            onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
             className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring num"
             dir="ltr"
             min="1"
           />
         </div>
-        {isAdmin && formData.type === 'sale' && (
+        {canViewPrices && formData.type !== 'usage' && (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
               سعر البيع (ج.م)
             </label>
             <input
               type="number"
-              value={formData.unitPrice}
-              onChange={(e) =>
-                setFormData({ ...formData, unitPrice: Number(e.target.value) })
-              }
-              className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring num"
+              value={formData.sellingPrice}
+              onChange={(e) => handleSellingPriceChange(Number(e.target.value))}
+              className={`w-full h-10 px-3 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring num ${
+                marginError ? 'border-destructive' : 'border-input'
+              }`}
               dir="ltr"
               min="0"
               step="0.01"
@@ -340,12 +489,29 @@ export default function Sales() {
         )}
       </div>
 
-      {isAdmin && formData.type === 'sale' && formData.quantity > 0 && formData.unitPrice > 0 && (
-        <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-          <p className="text-sm text-muted-foreground">إجمالي البيع:</p>
-          <p className="text-2xl font-bold text-primary num">
-            {formatCurrency(formData.quantity * formData.unitPrice)}
-          </p>
+      {marginError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">{marginError}</span>
+        </div>
+      )}
+
+      {canViewPrices && formData.type !== 'usage' && formData.quantity > 0 && formData.sellingPrice > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+            <p className="text-sm text-muted-foreground">إجمالي البيع:</p>
+            <p className="text-xl font-bold text-primary num">
+              {formatCurrency(formData.quantity * formData.sellingPrice)}
+            </p>
+          </div>
+          {canViewProfit && (
+            <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+              <p className="text-sm text-muted-foreground">الربح:</p>
+              <p className="text-xl font-bold text-success num">
+                {formatCurrency(formData.quantity * (formData.sellingPrice - formData.basePrice))}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -358,7 +524,7 @@ export default function Sales() {
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
           rows={3}
-          placeholder="مثال: غرفة العمليات رقم 3..."
+          placeholder="مثال: تثبيت كسر عظمة الفخذ..."
         />
       </div>
     </div>
@@ -367,13 +533,15 @@ export default function Sales() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="الاستهلاك والمبيعات"
-        description="تسجيل استخدام المستلزمات والمبيعات الخارجية"
+        title="العمليات الجراحية والمبيعات"
+        description="تسجيل استخدام المستلزمات والعمليات الجراحية"
         actions={
-          <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4 ml-2" />
-            تسجيل عملية
-          </Button>
+          canCreate && (
+            <Button onClick={openAddModal}>
+              <Plus className="w-4 h-4 ml-2" />
+              تسجيل عملية
+            </Button>
+          )
         }
       />
 
@@ -382,43 +550,24 @@ export default function Sales() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="بحث بالصنف..."
+          placeholder="بحث بالصنف أو المريض..."
           className="flex-1 max-w-md"
         />
         <div className="flex gap-2">
-          <button
-            onClick={() => setTypeFilter('all')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              typeFilter === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            )}
-          >
-            الكل
-          </button>
-          <button
-            onClick={() => setTypeFilter('usage')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              typeFilter === 'usage'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            )}
-          >
-            استهلاك
-          </button>
-          <button
-            onClick={() => setTypeFilter('sale')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              typeFilter === 'sale'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            )}
-          >
-            بيع
-          </button>
+          {(['all', 'surgery', 'usage', 'sale'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setTypeFilter(type)}
+              className={cn(
+                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                typeFilter === type
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              )}
+            >
+              {type === 'all' ? 'الكل' : type === 'surgery' ? 'جراحة' : type === 'usage' ? 'استهلاك' : 'بيع'}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -443,7 +592,7 @@ export default function Sales() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!formData.itemId || formData.quantity <= 0}
+              disabled={!formData.itemId || formData.quantity <= 0 || !!marginError}
             >
               حفظ
             </Button>
@@ -464,7 +613,9 @@ export default function Sales() {
             <Button variant="outline" onClick={() => setEditSale(null)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave}>حفظ التغييرات</Button>
+            <Button onClick={handleSave} disabled={!!marginError}>
+              حفظ التغييرات
+            </Button>
           </>
         }
       >
