@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Purchases from "./pages/Purchases";
 import Sales from "./pages/Sales";
+import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -54,6 +55,14 @@ const App = () => (
               element={
                 <MainLayout>
                   <Sales />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <MainLayout>
+                  <Analytics />
                 </MainLayout>
               }
             />

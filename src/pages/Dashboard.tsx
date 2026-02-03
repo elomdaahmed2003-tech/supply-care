@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockInventory, mockPurchases, mockSales } from '@/data/mockData';
-import { getStockStatus } from '@/types/inventory';
+import { mockInventory, mockPurchases, mockSales, mockSurgeries } from '@/data/mockData';
+import { getStockStatus, isDeadStock, CATEGORY_LABELS } from '@/types/inventory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatsCard } from '@/components/ui/StatsCard';
 import { DataTable } from '@/components/ui/DataTable';
@@ -12,31 +12,38 @@ import {
   AlertTriangle,
   TrendingUp,
   ShoppingCart,
-  TrendingDown,
+  Activity,
+  Skull,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
+  const { hasPermission, roleLabel } = useAuth();
+  const canViewPrices = hasPermission('canViewPrices');
+  const canViewFinancials = hasPermission('canViewFinancials');
 
   const stats = useMemo(() => {
     const totalValue = mockInventory.reduce(
-      (sum, item) => sum + item.quantity * item.unitCost,
+      (sum, item) => sum + item.quantity * item.basePrice,
       0
     );
     const lowStockCount = mockInventory.filter(
       (item) => getStockStatus(item.quantity, item.minStock) === 'low'
     ).length;
+    const deadStockCount = mockInventory.filter(
+      (item) => isDeadStock(item.lastMovementDate, 6)
+    ).length;
     const totalPurchases = mockPurchases.reduce((sum, p) => sum + p.totalCost, 0);
-    const totalSales = mockSales.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+    const totalProfit = mockSurgeries.reduce((sum, s) => sum + s.profit, 0);
 
     return {
       totalValue,
       totalSKUs: mockInventory.length,
       lowStockCount,
+      deadStockCount,
       totalPurchases,
-      totalSales,
+      totalProfit,
     };
   }, []);
 
@@ -46,8 +53,8 @@ export default function Dashboard() {
       .slice(0, 5);
   }, []);
 
-  const recentPurchases = useMemo(() => {
-    return [...mockPurchases]
+  const recentSurgeries = useMemo(() => {
+    return [...mockSurgeries]
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 5);
   }, []);
@@ -64,11 +71,19 @@ export default function Dashboard() {
     return new Intl.NumberFormat('en-EG').format(value);
   };
 
+  const getItemDisplayName = (item: typeof mockInventory[0]) => {
+    const parts = [item.name];
+    if (item.material) parts.push(item.material === 'titanium' ? 'Ti' : 'SS');
+    if (item.diameter) parts.push(item.diameter);
+    if (item.length) parts.push(item.length);
+    return parts.join(' - ');
+  };
+
   return (
     <div className="animate-fade-in">
       <PageHeader
         title="لوحة التحكم"
-        description="نظرة عامة على المخزون والعمليات"
+        description={`مرحباً بك - ${roleLabel}`}
       />
 
       {/* Stats Grid */}
@@ -87,37 +102,45 @@ export default function Dashboard() {
           variant={stats.lowStockCount > 0 ? 'danger' : 'default'}
         />
 
-        {isAdmin && (
-          <>
-            <StatsCard
-              title="إجمالي قيمة المخزون"
-              value={formatCurrency(stats.totalValue)}
-              icon={DollarSign}
-              variant="success"
-            />
-            <StatsCard
-              title="إجمالي المشتريات"
-              value={formatCurrency(stats.totalPurchases)}
-              icon={ShoppingCart}
-            />
-          </>
-        )}
+        <StatsCard
+          title="مخزون راكد"
+          value={formatNumber(stats.deadStockCount)}
+          icon={Skull}
+          variant={stats.deadStockCount > 0 ? 'warning' : 'default'}
+        />
 
-        {!isAdmin && (
-          <>
-            <StatsCard
-              title="إجمالي الكميات"
-              value={formatNumber(mockInventory.reduce((sum, i) => sum + i.quantity, 0))}
-              icon={TrendingUp}
-            />
-            <StatsCard
-              title="الفئات"
-              value={formatNumber(new Set(mockInventory.map(i => i.category)).size)}
-              icon={Package}
-            />
-          </>
+        {canViewFinancials ? (
+          <StatsCard
+            title="إجمالي قيمة المخزون"
+            value={formatCurrency(stats.totalValue)}
+            icon={DollarSign}
+            variant="success"
+          />
+        ) : (
+          <StatsCard
+            title="العمليات الجراحية"
+            value={formatNumber(mockSurgeries.length)}
+            icon={Activity}
+          />
         )}
       </div>
+
+      {/* Second Row Stats - Financial users only */}
+      {canViewFinancials && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          <StatsCard
+            title="إجمالي المشتريات"
+            value={formatCurrency(stats.totalPurchases)}
+            icon={ShoppingCart}
+          />
+          <StatsCard
+            title="إجمالي الأرباح"
+            value={formatCurrency(stats.totalProfit)}
+            icon={TrendingUp}
+            variant="success"
+          />
+        </div>
+      )}
 
       {/* Tables Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -137,7 +160,19 @@ export default function Dashboard() {
                 render: (item) => (
                   <div>
                     <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.size}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.sku}
+                    </p>
+                  </div>
+                ),
+              },
+              {
+                key: 'specs',
+                header: 'المواصفات',
+                render: (item) => (
+                  <div className="text-xs text-muted-foreground">
+                    {item.diameter && <span>{item.diameter}</span>}
+                    {item.length && <span> × {item.length}</span>}
                   </div>
                 ),
               },
@@ -166,30 +201,32 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Recent Purchases */}
+        {/* Recent Surgeries */}
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-center gap-2 mb-4">
-            <ShoppingCart className="w-5 h-5 text-primary" />
+            <Activity className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold text-foreground">
-              آخر المشتريات
+              آخر العمليات الجراحية
             </h2>
           </div>
           <DataTable
             columns={[
               {
-                key: 'itemName',
-                header: 'الصنف',
+                key: 'patient',
+                header: 'المريض',
                 render: (item) => (
-                  <p className="font-medium text-foreground truncate max-w-[150px]">
-                    {item.itemName}
+                  <p className="font-medium text-foreground truncate max-w-[120px]">
+                    {item.patientName}
                   </p>
                 ),
               },
               {
-                key: 'quantity',
-                header: 'الكمية',
+                key: 'type',
+                header: 'نوع العملية',
                 render: (item) => (
-                  <span className="num">{formatNumber(item.quantity)}</span>
+                  <p className="text-xs text-muted-foreground truncate max-w-[120px]">
+                    {item.type}
+                  </p>
                 ),
               },
               {
@@ -201,23 +238,23 @@ export default function Dashboard() {
                   </span>
                 ),
               },
-              ...(isAdmin
+              ...(canViewFinancials
                 ? [
                     {
-                      key: 'totalCost',
-                      header: 'الإجمالي',
-                      render: (item: any) => (
+                      key: 'profit',
+                      header: 'الربح',
+                      render: (item: typeof mockSurgeries[0]) => (
                         <span className="num font-medium text-success">
-                          {formatCurrency(item.totalCost)}
+                          {formatCurrency(item.profit)}
                         </span>
                       ),
                     },
                   ]
                 : []),
             ]}
-            data={recentPurchases}
+            data={recentSurgeries}
             keyExtractor={(item) => item.id}
-            emptyMessage="لا توجد مشتريات"
+            emptyMessage="لا توجد عمليات"
           />
         </div>
       </div>

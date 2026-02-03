@@ -1,19 +1,25 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockPurchases, mockInventory, mockSuppliers } from '@/data/mockData';
-import { Purchase } from '@/types/inventory';
+import { Purchase, CATEGORY_LABELS, MATERIAL_LABELS } from '@/types/inventory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from 'sonner';
 
 export default function Purchases() {
-  const { isAdmin } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const canCreate = hasPermission('canCreateStockIn');
+  const canEdit = hasPermission('canEditAfterSubmit');
+  const canDelete = hasPermission('canDeleteRecords');
+  const canViewPrices = hasPermission('canViewPrices');
+
   const [purchases, setPurchases] = useState<Purchase[]>(mockPurchases);
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -51,6 +57,14 @@ export default function Purchases() {
     return new Intl.NumberFormat('en-EG').format(value);
   };
 
+  const getItemDisplayName = (item: typeof mockInventory[0]) => {
+    const parts = [item.name];
+    if (item.material) parts.push(MATERIAL_LABELS[item.material]);
+    if (item.diameter) parts.push(item.diameter);
+    if (item.length) parts.push(item.length);
+    return parts.join(' - ');
+  };
+
   const resetForm = () => {
     setFormData({
       supplierId: '',
@@ -70,6 +84,10 @@ export default function Purchases() {
   };
 
   const openEditModal = (purchase: Purchase) => {
+    if (purchase.isLocked && !canEdit) {
+      toast.error('لا يمكن تعديل هذا السجل بعد الحفظ');
+      return;
+    }
     setFormData({
       supplierId: purchase.supplierId,
       supplierName: purchase.supplierName,
@@ -97,8 +115,8 @@ export default function Purchases() {
     setFormData({
       ...formData,
       itemId,
-      itemName: item ? `${item.name} - ${item.size}` : '',
-      unitCost: item?.unitCost || 0,
+      itemName: item ? getItemDisplayName(item) : '',
+      unitCost: item?.basePrice || 0,
     });
   };
 
@@ -119,15 +137,26 @@ export default function Purchases() {
         )
       );
       setEditPurchase(null);
+      toast.success('تم تحديث فاتورة الشراء');
     } else {
       const newPurchase: Purchase = {
         id: Date.now().toString(),
-        ...formData,
+        supplierId: formData.supplierId,
+        supplierName: formData.supplierName,
+        itemId: formData.itemId,
+        itemName: formData.itemName,
+        quantity: formData.quantity,
+        unitCost: formData.unitCost,
+        notes: formData.notes,
         totalCost,
         date: new Date(formData.date),
+        createdBy: user?.id || '',
+        createdAt: new Date(),
+        isLocked: true, // Lock after creation for data_entry role
       };
       setPurchases((prev) => [newPurchase, ...prev]);
       setIsAddModalOpen(false);
+      toast.success('تم تسجيل فاتورة الشراء');
     }
     resetForm();
   };
@@ -136,6 +165,7 @@ export default function Purchases() {
     if (deletePurchase) {
       setPurchases((prev) => prev.filter((p) => p.id !== deletePurchase.id));
       setDeletePurchase(null);
+      toast.success('تم حذف الفاتورة');
     }
   };
 
@@ -173,7 +203,7 @@ export default function Purchases() {
       },
     ];
 
-    if (isAdmin) {
+    if (canViewPrices) {
       baseColumns.push(
         {
           key: 'unitCost',
@@ -199,30 +229,40 @@ export default function Purchases() {
       header: 'الإجراءات',
       render: (item: Purchase) => (
         <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              openEditModal(item);
-            }}
-            className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeletePurchase(item);
-            }}
-            className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {item.isLocked && !canEdit ? (
+            <Lock className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <>
+              {canEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditModal(item);
+                  }}
+                  className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeletePurchase(item);
+                  }}
+                  className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          )}
         </div>
       ),
     });
 
     return baseColumns;
-  }, [isAdmin]);
+  }, [canViewPrices, canEdit, canDelete]);
 
   const FormContent = () => (
     <div className="space-y-4">
@@ -270,7 +310,7 @@ export default function Purchases() {
           <option value="">اختر الصنف</option>
           {mockInventory.map((item) => (
             <option key={item.id} value={item.id}>
-              {item.name} - {item.size}
+              {getItemDisplayName(item)}
             </option>
           ))}
         </select>
@@ -292,7 +332,7 @@ export default function Purchases() {
             min="1"
           />
         </div>
-        {isAdmin && (
+        {canViewPrices && (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
               سعر الوحدة (ج.م)
@@ -312,7 +352,7 @@ export default function Purchases() {
         )}
       </div>
 
-      {isAdmin && formData.quantity > 0 && formData.unitCost > 0 && (
+      {canViewPrices && formData.quantity > 0 && formData.unitCost > 0 && (
         <div className="p-4 rounded-lg bg-success/10 border border-success/20">
           <p className="text-sm text-muted-foreground">الإجمالي:</p>
           <p className="text-2xl font-bold text-success num">
@@ -342,10 +382,12 @@ export default function Purchases() {
         title="المشتريات"
         description="تسجيل ومتابعة فواتير الشراء"
         actions={
-          <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4 ml-2" />
-            تسجيل فاتورة
-          </Button>
+          canCreate && (
+            <Button onClick={openAddModal}>
+              <Plus className="w-4 h-4 ml-2" />
+              تسجيل فاتورة
+            </Button>
+          )
         }
       />
 
