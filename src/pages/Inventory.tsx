@@ -10,7 +10,6 @@ import {
   ItemCategory,
   MaterialType,
   calculatePlateCuttingCost,
-  PLATE_LENGTH_OPTIONS,
 } from '@/types/inventory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable } from '@/components/ui/DataTable';
@@ -19,6 +18,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/button';
+import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { Plus, Edit2, Trash2, Filter, Scissors, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -559,11 +559,21 @@ export default function Inventory() {
   const CuttingContent = () => {
     if (!cuttingItem) return null;
 
+    // Get current holes from original plate
     const currentHoles = parseInt(cuttingItem.length?.replace('-hole', '') || '0');
-    const availableLengths = PLATE_LENGTH_OPTIONS.filter((opt) => {
-      const holes = parseInt(opt.replace('-hole', ''));
-      return holes < currentHoles;
-    });
+    
+    // Generate options for 1-10 holes (only those smaller than current)
+    const holeOptions = Array.from({ length: 10 }, (_, i) => i + 1)
+      .filter(holes => holes < currentHoles)
+      .map(holes => ({
+        value: `${holes}-hole`,
+        label: `${holes}-hole (${holes} فتحات)`,
+      }));
+
+    // Calculate new price based on selected length
+    const calculatedPrice = cuttingData.newLength 
+      ? calculatePlateCuttingCost(cuttingItem.length || '', cuttingData.newLength, cuttingItem.basePrice)
+      : 0;
 
     return (
       <div className="space-y-4">
@@ -581,23 +591,28 @@ export default function Inventory() {
           <label className="block text-sm font-medium text-foreground">
             الطول الجديد بعد القطع <span className="text-destructive">*</span>
           </label>
-          <select
+          <SearchableCombobox
+            options={holeOptions}
             value={cuttingData.newLength}
-            onChange={(e) => setCuttingData({ newLength: e.target.value })}
-            className="w-full h-10 px-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">اختر الطول</option>
-            {availableLengths.map((length) => (
-              <option key={length} value={length}>{length}</option>
-            ))}
-          </select>
+            onChange={(value) => setCuttingData({ newLength: value })}
+            placeholder="اختر أو اكتب الطول الجديد..."
+            allowCustom={true}
+            customPlaceholder="مثال: 5-hole أو 3-hole"
+            dir="ltr"
+          />
+          <p className="text-xs text-muted-foreground">
+            اختر من القائمة أو اكتب قيمة مخصصة (مثل: 5-hole)
+          </p>
         </div>
 
         {cuttingData.newLength && (
           <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">السعر الجديد المحسوب:</p>
             <p className="text-xl font-bold text-primary num">
-              {formatCurrency(calculatePlateCuttingCost(cuttingItem.length || '', cuttingData.newLength, cuttingItem.basePrice))}
+              {formatCurrency(calculatedPrice)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              (محسوب تناسبياً من السعر الأصلي)
             </p>
           </div>
         )}
