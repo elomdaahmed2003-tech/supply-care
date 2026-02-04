@@ -146,7 +146,15 @@ export default function Login() {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
-            تطوير وبرمجة: <span className="font-medium text-primary">وثق Wathqq</span>
+            تطوير وبرمجة:{' '}
+            <a 
+              href="https://wathqq.vercel.app/?fbclid=IwY2xjawPwaPdleHRuA2FlbQIxMABicmlkETFsUXBQbDlJYmt0N2thNVlmc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHmojtsZorR28kbMZ_11zq6Wq2isNV0PTvAD6znvZHimfvmQ3i4IbTFmVZ8X-_aem_CHPISzAUqxozJ9TGadfb2A"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline transition-all"
+            >
+              وثق Wathqq
+            </a>
           </p>
         </div>
       </div>
