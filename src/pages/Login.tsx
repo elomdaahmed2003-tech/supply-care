@@ -39,7 +39,7 @@ export default function Login() {
             <Stethoscope className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">
-            نظام إدارة المستلزمات الجراحية
+            شركة الدلتا للمستلزمات الطبية
           </h1>
           <p className="text-muted-foreground mt-2">
             قم بتسجيل الدخول للوصول إلى لوحة التحكم
@@ -141,6 +141,13 @@ export default function Login() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6">
+          <p className="text-sm text-muted-foreground">
+            تطوير وبرمجة: <span className="font-medium text-primary">وثق Wathqq</span>
+          </p>
         </div>
       </div>
     </div>
