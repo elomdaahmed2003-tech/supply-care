@@ -5,8 +5,12 @@ import {
   Supplier, 
   Doctor, 
   Surgery,
-  SystemSettings 
+  SystemSettings,
+  ScrapLog,
 } from '@/types/inventory';
+
+// ============= Scrap/Cutting Logs =============
+export const mockScrapLogs: ScrapLog[] = [];
 
 // ============= System Settings =============
 export const mockSettings: SystemSettings = {

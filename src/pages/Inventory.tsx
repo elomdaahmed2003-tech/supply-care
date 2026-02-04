@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockInventory } from '@/data/mockData';
+import { mockInventory, mockScrapLogs } from '@/data/mockData';
 import { 
   InventoryItem, 
+  ScrapLog,
   getStockStatus, 
   validateMargin,
   CATEGORY_LABELS,
@@ -33,6 +34,7 @@ export default function Inventory() {
   const canPerformPlateCutting = hasPermission('canPerformPlateCutting');
 
   const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
+  const [_scrapLogs, setScrapLogs] = useState<ScrapLog[]>(mockScrapLogs);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [materialFilter, setMaterialFilter] = useState<string>('');
@@ -217,6 +219,9 @@ export default function Inventory() {
       cuttingItem.basePrice
     );
 
+    // Calculate scrap value (difference between original and new)
+    const scrapValue = cuttingItem.basePrice - newCost;
+
     // Deduct from original
     setInventory((prev) =>
       prev.map((item) =>
@@ -235,7 +240,12 @@ export default function Inventory() {
         item.length === cuttingData.newLength
     );
 
+    let newItemId: string;
+    let newItemName: string;
+
     if (existingVariant) {
+      newItemId = existingVariant.id;
+      newItemName = `${existingVariant.name} - ${existingVariant.material ? MATERIAL_LABELS[existingVariant.material] : ''} ${existingVariant.diameter || ''} × ${cuttingData.newLength}`;
       setInventory((prev) =>
         prev.map((item) =>
           item.id === existingVariant.id
@@ -245,9 +255,11 @@ export default function Inventory() {
       );
     } else {
       // Create new variant
+      newItemId = Date.now().toString();
+      newItemName = `${cuttingItem.name} - ${cuttingItem.material ? MATERIAL_LABELS[cuttingItem.material] : ''} ${cuttingItem.diameter || ''} × ${cuttingData.newLength}`;
       const newItem: InventoryItem = {
         ...cuttingItem,
-        id: Date.now().toString(),
+        id: newItemId,
         length: cuttingData.newLength,
         sku: `${cuttingItem.sku.split('-').slice(0, -1).join('-')}-${cuttingData.newLength.replace('-hole', 'H')}`,
         quantity: 1,
@@ -260,6 +272,27 @@ export default function Inventory() {
       };
       setInventory((prev) => [...prev, newItem]);
     }
+
+    // Create scrap log entry
+    const scrapLog: ScrapLog = {
+      id: `scrap-${Date.now()}`,
+      originalItemId: cuttingItem.id,
+      originalItemName: `${cuttingItem.name} - ${cuttingItem.material ? MATERIAL_LABELS[cuttingItem.material] : ''} ${cuttingItem.diameter || ''} × ${cuttingItem.length}`,
+      originalLength: cuttingItem.length || '',
+      newItemId,
+      newItemName,
+      newLength: cuttingData.newLength,
+      scrapMaterial: cuttingItem.material ? MATERIAL_LABELS[cuttingItem.material] : 'غير محدد',
+      originalBasePrice: cuttingItem.basePrice,
+      newBasePrice: newCost,
+      scrapValue,
+      date: new Date(),
+      createdBy: user?.id || '',
+      notes: `تم قطع شريحة من ${cuttingItem.length} إلى ${cuttingData.newLength}`,
+    };
+    
+    setScrapLogs((prev) => [...prev, scrapLog]);
+    mockScrapLogs.push(scrapLog); // Also update mock data for persistence across components
 
     toast.success(`تم قطع الشريحة من ${cuttingItem.length} إلى ${cuttingData.newLength}`);
     setCuttingItem(null);

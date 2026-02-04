@@ -225,6 +225,24 @@ export function validateMargin(basePrice: number, sellingPrice: number): MarginV
   };
 }
 
+// ============= Scrap/Cutting Log =============
+export interface ScrapLog {
+  id: string;
+  originalItemId: string;
+  originalItemName: string;
+  originalLength: string;
+  newItemId: string;
+  newItemName: string;
+  newLength: string;
+  scrapMaterial: string;
+  originalBasePrice: number;
+  newBasePrice: number;
+  scrapValue: number;
+  date: Date;
+  createdBy: string;
+  notes?: string;
+}
+
 // ============= System Settings =============
 export interface SystemSettings {
   deadStockThresholdMonths: number;
