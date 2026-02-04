@@ -54,8 +54,8 @@ export function Sidebar() {
         </div>
         {!isCollapsed && (
           <div className="animate-fade-in">
-            <h1 className="font-bold text-foreground">مستلزمات العظام</h1>
-            <p className="text-xs text-muted-foreground">نظام إدارة سلسلة التوريد</p>
+            <h1 className="font-bold text-foreground text-sm">شركة الدلتا للمستلزمات الطبية</h1>
+            <p className="text-xs text-muted-foreground">نظام إدارة المخزون</p>
           </div>
         )}
       </div>

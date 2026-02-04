@@ -82,7 +82,7 @@ export default function Dashboard() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="لوحة التحكم"
+        title="شركة الدلتا للمستلزمات الطبية"
         description={`مرحباً بك - ${roleLabel}`}
       />
 
