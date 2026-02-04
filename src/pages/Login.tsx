@@ -122,15 +122,21 @@ export default function Login() {
             </p>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                <span className="text-muted-foreground">مدير النظام:</span>
+                <span className="text-muted-foreground">إدخال بيانات:</span>
                 <code className="text-foreground font-mono text-xs" dir="ltr">
-                  admin@hospital.com / admin123
+                  entry@hospital.com / entry123
                 </code>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                <span className="text-muted-foreground">موظف:</span>
+                <span className="text-muted-foreground">مشرف:</span>
                 <code className="text-foreground font-mono text-xs" dir="ltr">
-                  staff@hospital.com / staff123
+                  supervisor@hospital.com / super123
+                </code>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                <span className="text-muted-foreground">شريك:</span>
+                <code className="text-foreground font-mono text-xs" dir="ltr">
+                  partner@hospital.com / partner123
                 </code>
               </div>
             </div>
