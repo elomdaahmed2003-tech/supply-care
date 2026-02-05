@@ -20,8 +20,17 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
-import { Plus, Edit2, Trash2, Filter, Scissors, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Filter, Scissors, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Helper function to check if item has no movement for 90+ days
+function isNoMovement90Days(lastMovementDate: Date): boolean {
+  const now = new Date();
+  const diffDays = Math.floor(
+    (now.getTime() - lastMovementDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  return diffDays >= 90;
+}
 
 export default function Inventory() {
   const { hasPermission, user } = useAuth();
@@ -346,7 +355,18 @@ export default function Inventory() {
         key: 'status',
         header: 'الحالة',
         render: (item: InventoryItem) => (
-          <StatusBadge status={getStockStatus(item.quantity, item.minStock)} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={getStockStatus(item.quantity, item.minStock)} />
+            {isNoMovement90Days(item.lastMovementDate) && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20"
+                title="لا حركة منذ 90 يوم"
+              >
+                <Clock className="w-3 h-3" />
+                راكد
+              </span>
+            )}
+          </div>
         ),
       },
     ];
