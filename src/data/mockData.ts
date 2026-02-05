@@ -51,9 +51,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 20,
     basePrice: 250,
     sellingPrice: 350,
-    lastMovementDate: new Date('2024-01-15'),
+    lastMovementDate: new Date('2026-01-15'), // Recent - 1 month ago
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-15'),
+    updatedAt: new Date('2026-01-15'),
     createdBy: '2',
   },
   {
@@ -68,9 +68,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 20,
     basePrice: 280,
     sellingPrice: 380,
-    lastMovementDate: new Date('2024-01-20'),
+    lastMovementDate: new Date('2025-12-01'), // 2 months ago
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-20'),
+    updatedAt: new Date('2025-12-01'),
     createdBy: '2',
   },
   {
@@ -85,9 +85,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 15,
     basePrice: 300,
     sellingPrice: 420,
-    lastMovementDate: new Date('2024-01-22'),
+    lastMovementDate: new Date('2025-10-01'), // 4 months ago
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-22'),
+    updatedAt: new Date('2025-10-01'),
     createdBy: '2',
   },
   // Cortical Screws - Stainless
@@ -103,9 +103,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 25,
     basePrice: 180,
     sellingPrice: 260,
-    lastMovementDate: new Date('2024-01-18'),
+    lastMovementDate: new Date('2025-08-01'), // 6 months ago
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-18'),
+    updatedAt: new Date('2025-08-01'),
     createdBy: '2',
   },
   {
@@ -120,9 +120,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 30,
     basePrice: 150,
     sellingPrice: 220,
-    lastMovementDate: new Date('2024-01-10'),
+    lastMovementDate: new Date('2025-05-01'), // 9 months ago
     createdAt: new Date('2023-07-01'),
-    updatedAt: new Date('2024-01-10'),
+    updatedAt: new Date('2025-05-01'),
     createdBy: '2',
   },
   // Cancellous Screws
@@ -138,9 +138,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 10,
     basePrice: 350,
     sellingPrice: 480,
-    lastMovementDate: new Date('2024-01-05'),
+    lastMovementDate: new Date('2025-02-01'), // 12 months ago
     createdAt: new Date('2023-08-01'),
-    updatedAt: new Date('2024-01-05'),
+    updatedAt: new Date('2025-02-01'),
     createdBy: '2',
   },
   // DCP Plates - Titanium
@@ -156,9 +156,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 8,
     basePrice: 1800,
     sellingPrice: 2500,
-    lastMovementDate: new Date('2024-01-12'),
+    lastMovementDate: new Date('2026-01-20'), // Recent
     createdAt: new Date('2023-06-15'),
-    updatedAt: new Date('2024-01-12'),
+    updatedAt: new Date('2026-01-20'),
     createdBy: '2',
   },
   {
@@ -173,9 +173,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 6,
     basePrice: 2200,
     sellingPrice: 3000,
-    lastMovementDate: new Date('2024-01-08'),
+    lastMovementDate: new Date('2025-11-01'), // 3 months ago
     createdAt: new Date('2023-06-15'),
-    updatedAt: new Date('2024-01-08'),
+    updatedAt: new Date('2025-11-01'),
     createdBy: '2',
   },
   {
@@ -190,9 +190,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 5,
     basePrice: 2600,
     sellingPrice: 3500,
-    lastMovementDate: new Date('2024-01-03'),
+    lastMovementDate: new Date('2025-07-01'), // 7 months ago
     createdAt: new Date('2023-06-15'),
-    updatedAt: new Date('2024-01-03'),
+    updatedAt: new Date('2025-07-01'),
     createdBy: '2',
   },
   {
@@ -207,9 +207,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 4,
     basePrice: 3000,
     sellingPrice: 4000,
-    lastMovementDate: new Date('2023-10-15'),
+    lastMovementDate: new Date('2025-04-01'), // 10 months ago
     createdAt: new Date('2023-06-15'),
-    updatedAt: new Date('2023-10-15'),
+    updatedAt: new Date('2025-04-01'),
     createdBy: '2',
   },
   // LCP Plates - Stainless
@@ -225,9 +225,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 10,
     basePrice: 1400,
     sellingPrice: 2000,
-    lastMovementDate: new Date('2024-01-19'),
+    lastMovementDate: new Date('2026-02-01'), // Very recent
     createdAt: new Date('2023-07-01'),
-    updatedAt: new Date('2024-01-19'),
+    updatedAt: new Date('2026-02-01'),
     createdBy: '2',
   },
   // Intramedullary Nails
@@ -243,9 +243,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 3,
     basePrice: 8500,
     sellingPrice: 12000,
-    lastMovementDate: new Date('2023-11-01'),
+    lastMovementDate: new Date('2024-11-01'), // 15 months ago
     createdAt: new Date('2023-05-01'),
-    updatedAt: new Date('2023-11-01'),
+    updatedAt: new Date('2024-11-01'),
     createdBy: '2',
   },
   {
@@ -260,9 +260,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 3,
     basePrice: 7000,
     sellingPrice: 10000,
-    lastMovementDate: new Date('2024-01-02'),
+    lastMovementDate: new Date('2025-06-01'), // 8 months ago
     createdAt: new Date('2023-05-01'),
-    updatedAt: new Date('2024-01-02'),
+    updatedAt: new Date('2025-06-01'),
     createdBy: '2',
   },
   // K-Wires
@@ -278,9 +278,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 40,
     basePrice: 25,
     sellingPrice: 45,
-    lastMovementDate: new Date('2024-01-21'),
+    lastMovementDate: new Date('2026-01-25'), // Recent
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-21'),
+    updatedAt: new Date('2026-01-25'),
     createdBy: '2',
   },
   // Instruments
@@ -294,9 +294,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 4,
     basePrice: 450,
     sellingPrice: 650,
-    lastMovementDate: new Date('2024-01-16'),
+    lastMovementDate: new Date('2025-09-01'), // 5 months ago
     createdAt: new Date('2023-06-01'),
-    updatedAt: new Date('2024-01-16'),
+    updatedAt: new Date('2025-09-01'),
     createdBy: '2',
   },
   // Dead Stock Example (no movement for 6+ months)
@@ -312,9 +312,9 @@ export const mockInventory: InventoryItem[] = [
     minStock: 2,
     basePrice: 3800,
     sellingPrice: 5000,
-    lastMovementDate: new Date('2023-06-01'),
+    lastMovementDate: new Date('2024-06-01'), // 20 months ago - very old
     createdAt: new Date('2023-01-01'),
-    updatedAt: new Date('2023-06-01'),
+    updatedAt: new Date('2024-06-01'),
     createdBy: '2',
   },
 ];
