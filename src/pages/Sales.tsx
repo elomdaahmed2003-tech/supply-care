@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockSales, mockInventory, mockDoctors, mockSurgeries } from '@/data/mockData';
 import { Sale, MATERIAL_LABELS, validateMargin } from '@/types/inventory';
@@ -7,12 +7,13 @@ import { DataTable } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit2, Trash2, TrendingDown, ShoppingBag, Activity, Lock, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingDown, ShoppingBag, Activity, Lock, AlertTriangle, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SurgeryPrintReport } from '@/components/reports/SurgeryPrintReport';
 
 export default function Sales() {
   const { hasPermission, user } = useAuth();
@@ -28,7 +29,9 @@ export default function Sales() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editSale, setEditSale] = useState<Sale | null>(null);
   const [deleteSale, setDeleteSale] = useState<Sale | null>(null);
+  const [printSale, setPrintSale] = useState<Sale | null>(null);
   const [marginError, setMarginError] = useState<string | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     itemId: '',
@@ -209,6 +212,119 @@ export default function Sales() {
       toast.success('تم حذف العملية');
     }
   };
+  const handlePrint = () => {
+    if (!printRef.current) return;
+    
+    const printContent = printRef.current.innerHTML;
+    const printWindow = window.open('', '_blank');
+    
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="UTF-8">
+          <title>تقرير العملية الجراحية - Surgery Report</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              background: white; 
+              color: black;
+              direction: rtl;
+            }
+            @media print {
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            }
+            .bg-white { background-color: white; }
+            .text-black { color: black; }
+            .bg-gray-50 { background-color: #f9fafb; }
+            .bg-gray-800 { background-color: #1f2937; }
+            .text-white { color: white; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-600 { color: #4b5563; }
+            .text-gray-700 { color: #374151; }
+            .text-gray-800 { color: #1f2937; }
+            .text-gray-900 { color: #111827; }
+            .border { border: 1px solid #d1d5db; }
+            .border-b { border-bottom: 1px solid #d1d5db; }
+            .border-b-2 { border-bottom: 2px solid; }
+            .border-t { border-top: 1px solid #d1d5db; }
+            .border-gray-200 { border-color: #e5e7eb; }
+            .border-gray-300 { border-color: #d1d5db; }
+            .border-gray-400 { border-color: #9ca3af; }
+            .border-gray-800 { border-color: #1f2937; }
+            .rounded-lg { border-radius: 0.5rem; }
+            .p-4 { padding: 1rem; }
+            .p-6 { padding: 1.5rem; }
+            .p-8 { padding: 2rem; }
+            .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+            .px-4 { padding-left: 1rem; padding-right: 1rem; }
+            .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+            .pb-2 { padding-bottom: 0.5rem; }
+            .pb-4 { padding-bottom: 1rem; }
+            .pt-3 { padding-top: 0.75rem; }
+            .pt-4 { padding-top: 1rem; }
+            .pt-8 { padding-top: 2rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-3 { margin-bottom: 0.75rem; }
+            .mb-6 { margin-bottom: 1.5rem; }
+            .mb-8 { margin-bottom: 2rem; }
+            .mt-1 { margin-top: 0.25rem; }
+            .mt-2 { margin-top: 0.5rem; }
+            .mt-3 { margin-top: 0.75rem; }
+            .mt-8 { margin-top: 2rem; }
+            .mt-auto { margin-top: auto; }
+            .text-xs { font-size: 0.75rem; }
+            .text-sm { font-size: 0.875rem; }
+            .text-lg { font-size: 1.125rem; }
+            .text-2xl { font-size: 1.5rem; }
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+            .font-medium { font-weight: 500; }
+            .font-normal { font-weight: 400; }
+            .font-mono { font-family: monospace; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .flex { display: flex; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+            .gap-4 { gap: 1rem; }
+            .gap-8 { gap: 2rem; }
+            .items-center { align-items: center; }
+            .justify-between { justify-content: space-between; }
+            .flex-1 { flex: 1; }
+            .space-y-2 > * + * { margin-top: 0.5rem; }
+            .w-full { width: 100%; }
+            .w-20 { width: 5rem; }
+            .h-16 { height: 4rem; }
+            .h-20 { height: 5rem; }
+            .min-h-\\[40px\\] { min-height: 40px; }
+            .min-h-\\[297mm\\] { min-height: 297mm; }
+            .w-\\[210mm\\] { width: 210mm; }
+            .mx-auto { margin-left: auto; margin-right: auto; }
+            table { border-collapse: collapse; }
+            .bg-gradient-to-br { background: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to)); }
+            .from-blue-600 { --tw-gradient-from: #2563eb; }
+            .to-blue-800 { --tw-gradient-to: #1e40af; }
+            .from-emerald-600 { --tw-gradient-from: #059669; }
+            .to-teal-700 { --tw-gradient-to: #0f766e; }
+          </style>
+        </head>
+        <body>
+          ${printContent}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
 
   const columns = useMemo(() => {
     const baseColumns = [
@@ -311,6 +427,18 @@ export default function Sales() {
       header: 'الإجراءات',
       render: (item: Sale) => (
         <div className="flex items-center gap-2">
+          {item.type === 'surgery' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setPrintSale(item);
+              }}
+              className="p-2 rounded-lg hover:bg-primary/10 transition-colors text-muted-foreground hover:text-primary"
+              title="طباعة التقرير"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+          )}
           {item.isLocked && !canEdit ? (
             <Lock className="w-4 h-4 text-muted-foreground" />
           ) : (
@@ -632,6 +760,29 @@ export default function Sales() {
         confirmText="حذف"
         variant="danger"
       />
+
+      {/* Print Report Modal */}
+      <Modal
+        isOpen={!!printSale}
+        onClose={() => setPrintSale(null)}
+        title="طباعة تقرير العملية"
+        size="xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setPrintSale(null)}>
+              إغلاق
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="w-4 h-4 ml-2" />
+              طباعة
+            </Button>
+          </>
+        }
+      >
+        <div className="max-h-[70vh] overflow-auto bg-muted/50 p-4 rounded-lg">
+          {printSale && <SurgeryPrintReport ref={printRef} sale={printSale} />}
+        </div>
+      </Modal>
     </div>
   );
 }
