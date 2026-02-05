@@ -22,16 +22,21 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 export default function Analytics() {
   const { hasPermission } = useAuth();
   const canViewAnalytics = hasPermission('canViewAnalytics');
   const [deadStockThreshold, setDeadStockThreshold] = useState(mockSettings.deadStockThresholdMonths);
-
-  // Redirect users without analytics access
-  if (!canViewAnalytics) {
-    return <Navigate to="/dashboard" replace />;
-  }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-EG', {
@@ -96,6 +101,17 @@ export default function Analytics() {
       .sort((a, b) => b.daysSinceMovement - a.daysSinceMovement);
   }, [deadStockThreshold]);
 
+  // Top 10 Dead Stock Items for Chart
+  const top10DeadStock = useMemo(() => {
+    return deadStockItems
+      .slice(0, 10)
+      .map((item) => ({
+        name: `${item.name} ${item.diameter || ''} ${item.length || ''}`.trim(),
+        days: item.daysSinceMovement,
+        value: item.totalValue,
+      }));
+  }, [deadStockItems]);
+
   // Profitability per Surgery
   const surgeryProfitability = useMemo(() => {
     return [...mockSurgeries]
@@ -126,6 +142,11 @@ export default function Analytics() {
       topDoctorProfit: topDoctor?.totalProfit || 0,
     };
   }, [deadStockItems, surgeonPortfolio]);
+
+  // Redirect users without analytics access
+  if (!canViewAnalytics) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const getItemSpecs = (item: typeof mockInventory[0]) => {
     const parts = [];
@@ -167,6 +188,65 @@ export default function Analytics() {
           icon={User}
           variant="primary"
         />
+      </div>
+
+      {/* Top 10 Dead Stock Chart */}
+      <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Skull className="w-5 h-5 text-destructive" />
+          <h2 className="text-lg font-bold text-foreground">
+            أعلى 10 أصناف راكدة (Top 10 Dead Stock)
+          </h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          الأصناف الأكثر ركوداً بناءً على آخر تاريخ حركة
+        </p>
+        {top10DeadStock.length > 0 ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={top10DeadStock}
+                layout="vertical"
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis 
+                  type="number" 
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  width={150}
+                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number) => [`${value} يوم`, 'أيام بدون حركة']}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Bar dataKey="days" radius={[0, 4, 4, 0]}>
+                  {top10DeadStock.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.days > 180 ? 'hsl(var(--destructive))' : 'hsl(var(--warning))'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-40 flex items-center justify-center text-muted-foreground">
+            <p>🎉 لا توجد أصناف راكدة</p>
+          </div>
+        )}
       </div>
 
       {/* Surgeon Portfolio */}
